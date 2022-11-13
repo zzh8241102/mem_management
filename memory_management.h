@@ -20,6 +20,8 @@ void* extend_heap(meta_block* address,size_t size);
 
 void * get_payload_from_meta_address(meta_block* meta_block_address);
 
+bool split_block(size_t size, meta_block *meta_address);
+
 size_t round_align(size_t size,uint64_t round_byte);
 
 void* _malloc(size_t size); // return the payload address
