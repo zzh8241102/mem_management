@@ -132,6 +132,17 @@ void *_malloc(size_t size) {
 }
 
 
+
+
+bool address_validation(void* p){
+
+}
+
+
 void *_free(void *ptr) {
+    // giving a ptr, and we set the pos to be freed [A F A]
+    // And we do a "recursive-like" merge
+    // [F F] A | [F F F] | A [F F]
+
 
 }
