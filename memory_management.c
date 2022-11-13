@@ -78,6 +78,10 @@ bool split_block(size_t size, meta_block *meta_address) {
     new_free_block->next = meta_address->next;
     new_free_block->allocated_block_data_size = meta_address->allocated_block_data_size - size - META_BLOCK_SIZE;
     // fix the older and the older subsequent one
+    // the latter one's prev equal to new one
+    meta_address->next->prev = new_free_block;
+    // the older one's next one is equal to the new one
+    meta_address->next = new_free_block;
     return true;
 
 }
