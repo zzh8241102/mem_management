@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
+#include <assert.h>
 
 #define META_BLOCK_SIZE sizeof(meta_block)
 
@@ -23,7 +24,7 @@ typedef struct mem_meta_block{
 
 meta_block *first_fit_search(size_t size);
 
-void* extend_heap(meta_block* address,size_t size);
+meta_block *extend_heap(meta_block* address,size_t size);
 
 void * get_payload_from_meta_address(meta_block* meta_block_address);
 
@@ -35,7 +36,7 @@ size_t round_align(size_t size,uint64_t round_byte);
 
 void merge_block(meta_block *latter_block);
 
-bool address_validation(meta_block *p);
+bool address_validation(void *p);
 
 void last_free_chunk_handler();
 /*

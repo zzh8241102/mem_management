@@ -8,9 +8,9 @@
  */
 
 #include "memory_management.h"
-#include <assert.h>
 
-#define DEBUG_MODE  // submit version should be set to 0 to avoid debug information
+
+#define DEBUG_MODE 1// submit version should be set to 0 to avoid debug information
 #define MODIFIED_GLOBAL_VARIABLE_WARNING
 
 /* -------------------------------
@@ -33,11 +33,14 @@ static meta_block *fetch_heap_last_meta_address() {
 
 }
 
-void *extend_heap(meta_block *last_address, size_t size) {
+meta_block *extend_heap(meta_block *last_address, size_t size) {
     // notice here modified the global variable heap end address
     meta_block *current_break = (meta_block *) sbrk(0);
     // move the pointer to the last pos
     if (sbrk(META_BLOCK_SIZE + size) == (void *) -1) {
+#if DEBUG_MODE
+        printf("cannot extend the heap");
+#endif
         return NULL;
     } else {
         // here is used to limit the case that the heap initially
@@ -55,7 +58,6 @@ void *extend_heap(meta_block *last_address, size_t size) {
         return current_break;
     }
 }
-
 
 
 void *get_payload_from_meta_address(meta_block *meta_block_address) {
@@ -78,7 +80,7 @@ meta_block *first_fit_search(size_t size) {
         if (curr_pos->free && curr_pos->allocated_block_data_size > size + META_BLOCK_SIZE) {
             // cannot equal to !!!
             return curr_pos;
-        } else if (curr_pos->allocated_block_data_size == size) {
+        } else if (curr_pos->free && curr_pos->allocated_block_data_size == size) {
             // will be judged on the split_block
             return curr_pos;
         } else {
@@ -107,6 +109,7 @@ bool split_block(size_t size, meta_block *meta_address) {
     new_free_block->allocated_block_data_size = meta_address->allocated_block_data_size - size - META_BLOCK_SIZE;
     // fix the older and the older subsequent one
     // the latter one's prev equal to new one
+    meta_address->allocated_block_data_size = size;
     meta_address->next->prev = new_free_block;
     // the older one's next one is equal to the new one
     meta_address->next = new_free_block;
@@ -125,35 +128,64 @@ void *_malloc(size_t size) {
     if (heap_start_address) {
         meta_block *proper_meta_address = first_fit_search(size);
         if (proper_meta_address == NULL) {
+#if DEBUG_MODE
+            printf("we are allocating a new space since the place is not enough,");
+#endif
             // allocate a new space
             // sbrk(0) or the end of the heap
 //            meta_block *s = extend_heap(sbrk(0), size);
             meta_block *s = extend_heap(fetch_heap_last_meta_address(), size);
+#if DEBUG_MODE
+            printf("successfully extend, now the extended meta address is %p\n", s);
+            printf("the extended payload address is %p\n", get_payload_from_meta_address(s));
+#endif
             if (!s) return NULL;
             return get_payload_from_meta_address(s);
         } else {
             // if found a workable place
+#if DEBUG_MODE
+            printf("There are some good memory fits: ");
+#endif
             if (!split_block(size, proper_meta_address)) {
                 // a most proper place
+#if DEBUG_MODE
+                printf("No need to split, we apply the proper size for it, and the meta address is%p\n",
+                       proper_meta_address);
+                printf("No need to split, we apply the proper size for it, and the payload address is%p\n",
+                       get_payload_from_meta_address(proper_meta_address));
+#endif
                 return get_payload_from_meta_address(proper_meta_address);
             } else {
                 // return the newly split block's meta block position
-                return get_payload_from_meta_address(proper_meta_address->next);
+                // no next
+#if DEBUG_MODE
+                printf("we split in a good way, the meta address is %p\n", proper_meta_address);
+                printf("we apply the proper size for it, and the payload address is%p\n",
+                       get_meta_address_from_payload(proper_meta_address));
+#endif
+                return get_payload_from_meta_address(proper_meta_address);
             }
         }
 
 
     } else {
+#if DEBUG_MODE
+        printf("Init the heap value here");
+#endif
         // init the heap since the start_address is NULL
         meta_block *meta_address = extend_heap(heap_start_address, size);
         if (meta_address == NULL) {
-#ifdef DEBUG_MODE
+#if DEBUG_MODE
             printf("There is not any space hah code is wrong ");
 #endif
             return NULL;
         } else {
             MODIFIED_GLOBAL_VARIABLE_WARNING
             heap_start_address = meta_address;
+#if DEBUG_MODE
+            printf("successfully inited,the start meta_address is %p\n", meta_address);
+            printf("the start payload_address is %p\n", get_payload_from_meta_address(meta_address));
+#endif
             return get_payload_from_meta_address(meta_address);
         }
     }
@@ -174,13 +206,15 @@ void merge_block(meta_block *latter_block) {
     // give the previous block more control space
     latter_block->prev->allocated_block_data_size += size_of_meta_and_payload;
     // set the previous' next to the dropped next
+    latter_block->next->prev = latter_block->prev;
     latter_block->prev->next = latter_block->next; // a expand finished
 
 }
 
 
-bool address_validation(meta_block *p) {
-    if (p == NULL|p<heap_start_address|p>fetch_heap_last_meta_address()) {
+bool address_validation(void *p) {
+    if (p == NULL | p < (void *) heap_start_address + META_BLOCK_SIZE
+        | p > get_payload_from_meta_address(fetch_heap_last_meta_address())) {
         return false;
     }
     return true;
@@ -208,9 +242,20 @@ void *_free(void *ptr) {
     curr_free_meta->free = true;
     // A F A or NULL F A or A F NULL
     // means no need to merge
+    if (curr_free_meta->next == NULL) {
+        memset(ptr, 0, get_meta_address_from_payload(ptr)->allocated_block_data_size);
+        // and since free is set, just return
+        return NULL;
+    }
+    if (curr_free_meta->prev == NULL) {
+        memset(ptr, 0, get_meta_address_from_payload(ptr)->allocated_block_data_size);
+        // and since free is set, just return
+        return NULL;
+    }
     if ((curr_free_meta->prev == NULL && curr_free_meta->next->free == false)
+        | (curr_free_meta->next == NULL && curr_free_meta->prev->free == false)
         | (curr_free_meta->prev->free == false && curr_free_meta->next->free == false)
-        | (curr_free_meta->prev->free = false && curr_free_meta->next == NULL)) {
+            ) {
         // delete the payload info
         // A[F]A F:[meta][value] => [meta->free][0000]
         // A[F]A F:[meta][value] => [meta->free][origin]
@@ -235,7 +280,8 @@ void *_free(void *ptr) {
     // find the next and merge
     if (curr_free_meta->prev != NULL && curr_free_meta->next != NULL && curr_free_meta->prev->free &&
         curr_free_meta->next->free) {
-        merge_block(curr_free_meta->next);
+        merge_block(curr_free_meta); // merge the first one
+        merge_block(curr_free_meta->next); // merge tne second one
     }
     last_free_chunk_handler();
 

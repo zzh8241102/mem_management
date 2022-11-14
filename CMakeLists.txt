@@ -3,4 +3,4 @@ project(mem_management C)
 
 set(CMAKE_C_STANDARD 11)
 
-add_executable(mem_management main.c memory_management.c memory_management.h)
+add_executable(mem_management unit_tests.c memory_management.c memory_management.h)
