@@ -1,3 +1,12 @@
+/**
+ * @FILE_NAME: memory_management.c
+ * @DESCRIPTION:Memory management function impl
+ * @MAIN_FUNC: void* _malloc(size_t size) and void* _free(void* ptr)
+ * @AUTHOR: Zihan Zhou
+ * @DATE: 2022-11
+ * @PURPOSE: The coursework of operating system
+ */
+
 #include "memory_management.h"
 #include <assert.h>
 
@@ -10,6 +19,19 @@
 */
 meta_block *heap_start_address = NULL;
 
+
+static meta_block *fetch_heap_last_meta_address() {
+    assert(heap_start_address != NULL);
+
+    // traverse the heap
+    meta_block *curr = heap_start_address;
+    while (curr->next != NULL) {
+        curr = curr->next;
+    }
+    return curr;
+
+
+}
 
 void *extend_heap(meta_block *last_address, size_t size) {
     // notice here modified the global variable heap end address
@@ -34,19 +56,7 @@ void *extend_heap(meta_block *last_address, size_t size) {
     }
 }
 
-static meta_block *fetch_heap_last_meta_address() {
-    MODIFIED_GLOBAL_VARIABLE_WARNING
-    assert(heap_start_address != NULL);
 
-    // traverse the heap
-    meta_block *curr = heap_start_address;
-    while (curr->next != NULL) {
-        curr = curr->next;
-    }
-    return curr;
-
-
-}
 
 void *get_payload_from_meta_address(meta_block *meta_block_address) {
     return (void *) (meta_block_address + 1); // add size of meta_block
@@ -154,61 +164,79 @@ void *_malloc(size_t size) {
 void merge_block(meta_block *latter_block) {
     // merge_block always accept the meta_block ptr of
     // the latter pointer, and merge it with the previous one
-
+    //         merge<-[][]
+    //         [][size]->next
+    //         => [][size+s2+meta] ->next = dropped next
+    //         [][size]->next => [][size+expand]->next(deprecated)
     assert(latter_block->prev->free == true);
     // record the size or the latter_block and set the space to be empty
     size_t size_of_meta_and_payload = META_BLOCK_SIZE + latter_block->allocated_block_data_size;
-    memset(latter_block, 0, size_of_meta_and_payload);
-    // give the previous block more control
+    // give the previous block more control space
     latter_block->prev->allocated_block_data_size += size_of_meta_and_payload;
+    // set the previous' next to the dropped next
+    latter_block->prev->next = latter_block->next; // a expand finished
 
 }
 
 
-bool address_validation(void *p) {
-    if (p == NULL) return false;
+bool address_validation(meta_block *p) {
+    if (p == NULL|p<heap_start_address|p>fetch_heap_last_meta_address()) {
+        return false;
+    }
     return true;
 }
 
+void last_free_chunk_handler() {
+    meta_block *last = fetch_heap_last_meta_address();
+    if (last->free && last->next == NULL) {
+        assert(last->prev->next != NULL);
+        // delete the big free chunk
+        brk(last);
+        last->prev->next = NULL;
+    }
 
-void *_free(void *_malloc_ptr) {
+}
+
+void *_free(void *ptr) {
     // giving a ptr, and we set the pos to be freed [A F A]
     // And we do a "recursive-like" merge
     // [F F] A | [F F F] | A [F F]
-    if (!address_validation(_malloc_ptr)) return NULL;
-    //find the meta_data from the _malloc_ptr
-    meta_block *curr_free_meta = get_meta_address_from_payload(_malloc_ptr);
+    if (!address_validation(ptr)) return NULL;
+    //find the meta_data from the ptr
+    meta_block *curr_free_meta = get_meta_address_from_payload(ptr);
     //set must-walk free curr
     curr_free_meta->free = true;
     // A F A or NULL F A or A F NULL
     // means no need to merge
-    if((curr_free_meta->prev==NULL&&curr_free_meta->next->free==false)
-      |(curr_free_meta->prev->free==false&&curr_free_meta->next->free==false)
-      |(curr_free_meta->prev->free=false&&curr_free_meta->next==NULL))
-    {
+    if ((curr_free_meta->prev == NULL && curr_free_meta->next->free == false)
+        | (curr_free_meta->prev->free == false && curr_free_meta->next->free == false)
+        | (curr_free_meta->prev->free = false && curr_free_meta->next == NULL)) {
         // delete the payload info
-        memset(_malloc_ptr,0, get_meta_address_from_payload(_malloc_ptr)->allocated_block_data_size);
+        // A[F]A F:[meta][value] => [meta->free][0000]
+        // A[F]A F:[meta][value] => [meta->free][origin]
+        memset(ptr, 0, get_meta_address_from_payload(ptr)->allocated_block_data_size);
         // and since free is set, just return
         return NULL;
     }
     // merge the previous
     // A F A -> F F A-> FB A
-    if(curr_free_meta->prev!=NULL&&curr_free_meta->next->free==false&&curr_free_meta->prev->free==true){
+    if (curr_free_meta->prev != NULL && curr_free_meta->next->free == false && curr_free_meta->prev->free == true) {
         //
         merge_block(curr_free_meta);
         return NULL;
     }
     // merge the next
     //A A F -> A F F -> A FB
-    if(curr_free_meta->next!=NULL&&curr_free_meta->prev->free==false&&curr_free_meta->next->free==true){
+    if (curr_free_meta->next != NULL && curr_free_meta->prev->free == false && curr_free_meta->next->free == true) {
         merge_block(curr_free_meta->next);
     }
-   // both merge (Actually same as previous)
-   // F A F -> F F F
-   // find the next and merge
-   if(curr_free_meta->prev!=NULL&&curr_free_meta->next!=NULL&&curr_free_meta->prev->free&&curr_free_meta->next->free){
-       merge_block(curr_free_meta->next);
-   }
-
+    // both merge (Actually same as previous, For Reader-Friendly purpose attach it here)
+    // F A F -> F F F
+    // find the next and merge
+    if (curr_free_meta->prev != NULL && curr_free_meta->next != NULL && curr_free_meta->prev->free &&
+        curr_free_meta->next->free) {
+        merge_block(curr_free_meta->next);
+    }
+    last_free_chunk_handler();
 
 }

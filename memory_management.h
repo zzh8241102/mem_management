@@ -6,7 +6,7 @@
 
 #define META_BLOCK_SIZE sizeof(meta_block)
 
-// meta_block* addr   addr+META_BLOCK_SIZE = DATA_START_ADDR
+// [meta] ->(by add 1(sizeof(meta)))[data]
 typedef struct mem_meta_block{
     size_t allocated_block_data_size;
     struct mem_meta_block* prev;
@@ -33,6 +33,11 @@ bool split_block(size_t size, meta_block *meta_address);
 
 size_t round_align(size_t size,uint64_t round_byte);
 
+void merge_block(meta_block *latter_block);
+
+bool address_validation(meta_block *p);
+
+void last_free_chunk_handler();
 /*
  *-------------------------------
   key functions
