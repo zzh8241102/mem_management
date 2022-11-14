@@ -1,7 +1,7 @@
 #include "memory_management.h"
 #include <assert.h>
 
-#define DEBUG_MODE 1
+#define DEBUG_MODE  // submit version should be set to 0 to avoid debug information
 #define MODIFIED_GLOBAL_VARIABLE_WARNING
 
 /* -------------------------------
@@ -19,7 +19,7 @@ void *extend_heap(meta_block *last_address, size_t size) {
         return NULL;
     } else {
         // here is used to limit the case that the heap initially
-        // is a empty linked list
+        // is an empty_linked list
         if (last_address != NULL) {
             // attach to the last address
             last_address->next = current_break;
@@ -34,10 +34,28 @@ void *extend_heap(meta_block *last_address, size_t size) {
     }
 }
 
+static meta_block *fetch_heap_last_meta_address() {
+    MODIFIED_GLOBAL_VARIABLE_WARNING
+    assert(heap_start_address != NULL);
+
+    // traverse the heap
+    meta_block *curr = heap_start_address;
+    while (curr->next != NULL) {
+        curr = curr->next;
+    }
+    return curr;
+
+
+}
 
 void *get_payload_from_meta_address(meta_block *meta_block_address) {
     return (void *) (meta_block_address + 1); // add size of meta_block
 }
+
+meta_block *get_meta_address_from_payload(void *payload_address) {
+    return ((meta_block *) payload_address) - 1;
+}
+
 
 // You can apply different kinds of search method
 meta_block *first_fit_search(size_t size) {
@@ -50,7 +68,7 @@ meta_block *first_fit_search(size_t size) {
         if (curr_pos->free && curr_pos->allocated_block_data_size > size + META_BLOCK_SIZE) {
             // cannot equal to !!!
             return curr_pos;
-        } else if (curr_pos->allocated_block_data_size) {
+        } else if (curr_pos->allocated_block_data_size == size) {
             // will be judged on the split_block
             return curr_pos;
         } else {
@@ -99,7 +117,8 @@ void *_malloc(size_t size) {
         if (proper_meta_address == NULL) {
             // allocate a new space
             // sbrk(0) or the end of the heap
-            meta_block *s = extend_heap(sbrk(0), size);
+//            meta_block *s = extend_heap(sbrk(0), size);
+            meta_block *s = extend_heap(fetch_heap_last_meta_address(), size);
             if (!s) return NULL;
             return get_payload_from_meta_address(s);
         } else {
@@ -132,17 +151,64 @@ void *_malloc(size_t size) {
 }
 
 
+void merge_block(meta_block *latter_block) {
+    // merge_block always accept the meta_block ptr of
+    // the latter pointer, and merge it with the previous one
 
-
-bool address_validation(void* p){
+    assert(latter_block->prev->free == true);
+    // record the size or the latter_block and set the space to be empty
+    size_t size_of_meta_and_payload = META_BLOCK_SIZE + latter_block->allocated_block_data_size;
+    memset(latter_block, 0, size_of_meta_and_payload);
+    // give the previous block more control
+    latter_block->prev->allocated_block_data_size += size_of_meta_and_payload;
 
 }
 
 
-void *_free(void *ptr) {
+bool address_validation(void *p) {
+    if (p == NULL) return false;
+    return true;
+}
+
+
+void *_free(void *_malloc_ptr) {
     // giving a ptr, and we set the pos to be freed [A F A]
     // And we do a "recursive-like" merge
     // [F F] A | [F F F] | A [F F]
+    if (!address_validation(_malloc_ptr)) return NULL;
+    //find the meta_data from the _malloc_ptr
+    meta_block *curr_free_meta = get_meta_address_from_payload(_malloc_ptr);
+    //set must-walk free curr
+    curr_free_meta->free = true;
+    // A F A or NULL F A or A F NULL
+    // means no need to merge
+    if((curr_free_meta->prev==NULL&&curr_free_meta->next->free==false)
+      |(curr_free_meta->prev->free==false&&curr_free_meta->next->free==false)
+      |(curr_free_meta->prev->free=false&&curr_free_meta->next==NULL))
+    {
+        // delete the payload info
+        memset(_malloc_ptr,0, get_meta_address_from_payload(_malloc_ptr)->allocated_block_data_size);
+        // and since free is set, just return
+        return NULL;
+    }
+    // merge the previous
+    // A F A -> F F A-> FB A
+    if(curr_free_meta->prev!=NULL&&curr_free_meta->next->free==false&&curr_free_meta->prev->free==true){
+        //
+        merge_block(curr_free_meta);
+        return NULL;
+    }
+    // merge the next
+    //A A F -> A F F -> A FB
+    if(curr_free_meta->next!=NULL&&curr_free_meta->prev->free==false&&curr_free_meta->next->free==true){
+        merge_block(curr_free_meta->next);
+    }
+   // both merge (Actually same as previous)
+   // F A F -> F F F
+   // find the next and merge
+   if(curr_free_meta->prev!=NULL&&curr_free_meta->next!=NULL&&curr_free_meta->prev->free&&curr_free_meta->next->free){
+       merge_block(curr_free_meta->next);
+   }
 
 
 }
