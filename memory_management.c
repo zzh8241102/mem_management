@@ -10,7 +10,7 @@
 #include "memory_management.h"
 
 
-#define DEBUG_MODE 0// submit version should be set to 0 to avoid debug information
+#define DEBUG_MODE 1// submit version should be set to 0 to avoid debug information
 #define MODIFIED_GLOBAL_VARIABLE_WARNING
 
 

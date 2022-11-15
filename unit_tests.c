@@ -181,7 +181,7 @@ void unit_test_8() {
     // the address of size2 should b+align(sizeb)+meta_block
     // notice here
 //    printf("size2 payload is %p\n", size2);
-    assert(size2 == (void *) b + round_align(4,8) + META_BLOCK_SIZE);
+    assert(size2 == (void *) b + round_align(4, 8) + META_BLOCK_SIZE);
     printf("PASTED UNIT_TEST8!\n");
 }
 
@@ -189,13 +189,35 @@ void unit_test_8() {
  *  and test whether the algo is robust
  */
 // robust malloc and free
-void unit_test_9(){
-    for(int i = 0;i<10;i++){
-        int* a = _malloc(4096*1000);
-        memset(a,0,4096*1000);
+void unit_test_9() {
+    for (int i = 0; i < 10; i++) {
+        int *a = _malloc(4096 * 10000);
+        memset(a, 0, 4096 * 10000);
         _free(a);
     }
     printf("PASTED UNIT_TEST9!\n");
+}
+
+// different type for malloc
+typedef struct test_ {
+    int a;
+    short b;
+    struct test_ *ptr;
+} test_block;
+
+void unit_test_10() {
+    int *a = _malloc(4 * sizeof(int));
+    _free(a);
+    short *b = _malloc(4 * sizeof(short));
+    _free(b);
+    long *c = _malloc(4 * sizeof(long));
+    _free(c);
+    float *d = _malloc((4 * sizeof(float)));
+    _free(d);
+    test_block *p = (test_block *) _malloc(100 * sizeof(test_block));
+    _free(p);
+    printf("PASTED UNIT_TEST10!\n");
+
 }
 
 // TODO: test the impl of split
@@ -231,6 +253,8 @@ void unit_test_demo_selector() {
             unit_test_8();
         case 9:
             unit_test_9();
+        case 10:
+            unit_test_10();
 //        default:
 //            printf("No this case, re-prompt the program and check if there are any typos");
     }
