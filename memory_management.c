@@ -10,7 +10,7 @@
 #include "memory_management.h"
 
 
-#define DEBUG_MODE 1// submit version should be set to 0 to avoid debug information
+#define DEBUG_MODE 0// submit version should be set to 0 to avoid debug information
 #define MODIFIED_GLOBAL_VARIABLE_WARNING
 
 
@@ -107,14 +107,15 @@ bool split_block(size_t size, meta_block *meta_address) {
         //expand if the curr block is the last and need to split
         new_free_block = extend_heap(meta_address,meta_address->allocated_block_data_size - size - META_BLOCK_SIZE);
     }
-    new_free_block = meta_address->next;
+//    new_free_block = meta_address->next;
+    new_free_block = get_payload_from_meta_address(meta_address) + size ;
     new_free_block->prev = meta_address;
     new_free_block->free = true;
     new_free_block->next = meta_address->next;
-
     new_free_block->allocated_block_data_size = meta_address->allocated_block_data_size - size - META_BLOCK_SIZE;
     // fix the older and the older subsequent one
     // the latter one's prev equal to new one
+    meta_address->free = false; // since you should return it
     meta_address->allocated_block_data_size = size;
     meta_address->next->prev = new_free_block;
     // the older one's next one is equal to the new one
@@ -129,6 +130,7 @@ size_t round_align(size_t size, uint64_t round_byte) {
 }
 
 void *_malloc(size_t size) {
+    if(size<=0) return NULL;
     size = round_align(size, 8);
     // if already has an address
     if (heap_start_address) {
@@ -176,7 +178,7 @@ void *_malloc(size_t size) {
 
     } else {
 #if DEBUG_MODE
-        printf("Init the heap value here");
+        printf("Init the heap value here\n");
 #endif
         // init the heap since the start_address is NULL
         meta_block *meta_address = extend_heap(heap_start_address, size);

@@ -125,8 +125,9 @@ void unit_test_5() {
     printf("PASTED UNIT_TEST5!\n");
 }
 
-/** test split cases
- [meta][big-size] =>[meta][need_size] + [meta][new_size] new_size = big-size - (meta_size+need_size)
+/**
+ * test split cases
+ * [meta][big-size] =>[meta][need_size] + [meta][new_size] new_size = big-size - (meta_size+need_size)
 */
 
 // must proper suit, no need to split
@@ -140,7 +141,7 @@ void unit_test_6() {
 
 }
 
-// test split -> the newly split small block is  attached
+// test split -> the newly split small block is attached
 void unit_test_7() {
     // [meta][48] -> []
     int *a = _malloc(48);
@@ -152,21 +153,49 @@ void unit_test_7() {
 
 }
 
+// split and test the older hole and newly added hole
 void unit_test_8() {
     // [m][size] -> [m][size] -> [m][size]
     // [m][size] -> [m][size1] -> [m][size2] ->[m][size]
     int *a = _malloc(48);
+    memset(a, 0, 48);
     int *stored_a = a;
     int *b = _malloc(48);
+    memset(a, 0, 48);
     int *stored_b = b;
     int *c = _malloc(48);
+    memset(a, 0, 48);
     int *stored_c = c;
     _free(b);
-    int size1 = _malloc(4);
-
-
+    // after that there are 48 remain and can be split
+    int *size1 = _malloc(4);
+    memset(a, 0, 8);
+    // give 4 and b will take the previous place
+    // also a new block sized 48-4==44 [32][12]
+    // after that the
+    assert(b == size1);
+    int *size2 = _malloc(4);
+    memset(a, 0, 8);
+    // assert the heap is not extended
+//    printf("b payload %p is: ", b);
+    // the address of size2 should b+align(sizeb)+meta_block
+    // notice here
+//    printf("size2 payload is %p\n", size2);
+    assert(size2 == (void *) b + round_align(4,8) + META_BLOCK_SIZE);
     printf("PASTED UNIT_TEST8!\n");
+}
 
+/** Let's scale it up
+ *  and test whether the algo is robust
+ */
+// robust malloc and free
+void unit_test_9(){
+    for(int i = 0;i<10;i++){
+        int* a = _malloc(4096*1000);
+        memset(a,0,4096*1000);
+        _free(a);
+    }
+    printf("PASTED UNIT_TEST9!\n");
 }
 
 // TODO: test the impl of split
@@ -200,13 +229,17 @@ void unit_test_demo_selector() {
             break;
         case 8:
             unit_test_8();
-        default:
-            printf("No this case, re-prompt the program and check if there are any typos");
+        case 9:
+            unit_test_9();
+//        default:
+//            printf("No this case, re-prompt the program and check if there are any typos");
     }
 }
 
 int main() {
 #if DEMO_PURPOSE
+    // NOTICE each time you can only select one case, cause each unit test is fully independent(since
+    // the address is dependent)
     unit_test_demo_selector();
 #endif
 }
