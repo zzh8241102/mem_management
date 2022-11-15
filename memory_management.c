@@ -13,6 +13,7 @@
 #define DEBUG_MODE 1// submit version should be set to 0 to avoid debug information
 #define MODIFIED_GLOBAL_VARIABLE_WARNING
 
+
 /* -------------------------------
   The heap_start_address
  *-------------------------------
@@ -102,10 +103,15 @@ bool split_block(size_t size, meta_block *meta_address) {
     // for the new_block
     // the meta part
     // the meta address
-    new_free_block = meta_address->next; // attach it to last linked list
+    if(meta_address->next == NULL){
+        //expand if the curr block is the last and need to split
+        new_free_block = extend_heap(meta_address,meta_address->allocated_block_data_size - size - META_BLOCK_SIZE);
+    }
+    new_free_block = meta_address->next;
     new_free_block->prev = meta_address;
     new_free_block->free = true;
     new_free_block->next = meta_address->next;
+
     new_free_block->allocated_block_data_size = meta_address->allocated_block_data_size - size - META_BLOCK_SIZE;
     // fix the older and the older subsequent one
     // the latter one's prev equal to new one
@@ -161,7 +167,7 @@ void *_malloc(size_t size) {
 #if DEBUG_MODE
                 printf("we split in a good way, the meta address is %p\n", proper_meta_address);
                 printf("we apply the proper size for it, and the payload address is%p\n",
-                       get_meta_address_from_payload(proper_meta_address));
+                       get_payload_from_meta_address(proper_meta_address));
 #endif
                 return get_payload_from_meta_address(proper_meta_address);
             }
