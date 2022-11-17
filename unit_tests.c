@@ -5,6 +5,7 @@
  * @AUTHOR: Zihan Zhou
  * @DATE: 2022-11
  * @PURPOSE: For better test and present the behaviour of _malloc and _free
+ * @NOTICE!!!: THIS IS NOT A PART OF THE CW, JUST FOR DEMO AND TEST
  */
 
 #include <stdio.h>
@@ -191,9 +192,16 @@ void unit_test_8() {
 // robust malloc and free
 void unit_test_9() {
     for (int i = 0; i < 10; i++) {
-        int *a = _malloc(4096 * 10000);
-        memset(a, 0, 4096 * 10000);
+        int *a = _malloc(4096*100);
+        memset(a, 100, 4096*100);
+        printf("allocated\n");
         _free(a);
+        getchar();
+        printf("we allocated a smaller chunk\n");
+        int *smaller_chunk = _malloc(1);
+        _free(smaller_chunk);
+        getchar();
+
     }
     printf("PASTED UNIT_TEST9!\n");
 }
@@ -207,14 +215,19 @@ typedef struct test_ {
 
 void unit_test_10() {
     int *a = _malloc(4 * sizeof(int));
+    memset(a,0,4*sizeof(int));
     _free(a);
     short *b = _malloc(4 * sizeof(short));
+    memset(a,0,4*sizeof(short));
     _free(b);
     long *c = _malloc(4 * sizeof(long));
+    memset(a,0,4*sizeof(long));
     _free(c);
     float *d = _malloc((4 * sizeof(float)));
+    memset(a,0,4*sizeof(float));
     _free(d);
     test_block *p = (test_block *) _malloc(100 * sizeof(test_block));
+    memset(a,0,100*sizeof(test_block));
     _free(p);
     printf("PASTED UNIT_TEST10!\n");
 
@@ -251,10 +264,13 @@ void unit_test_demo_selector() {
             break;
         case 8:
             unit_test_8();
+            break;
         case 9:
             unit_test_9();
+            break;
         case 10:
             unit_test_10();
+            break;
 //        default:
 //            printf("No this case, re-prompt the program and check if there are any typos");
     }
@@ -262,8 +278,6 @@ void unit_test_demo_selector() {
 
 int main() {
 #if DEMO_PURPOSE
-    // NOTICE each time you can only select one case, cause each unit test is fully independent(since
-    // the address is dependent)
     unit_test_demo_selector();
 #endif
 }

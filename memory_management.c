@@ -40,7 +40,7 @@ meta_block *extend_heap(meta_block *last_address, size_t size) {
     // move the pointer to the last pos
     if (sbrk(META_BLOCK_SIZE + size) == (void *) -1) {
 #if DEBUG_MODE
-        printf("cannot extend the heap");
+        printf("cannot extend the heap due to sbrk limitation, resort to another solution");
 #endif
         return NULL;
     } else {
@@ -103,12 +103,8 @@ bool split_block(size_t size, meta_block *meta_address) {
     // for the new_block
     // the meta part
     // the meta address
-    if(meta_address->next == NULL){
-        //expand if the curr block is the last and need to split
-        new_free_block = extend_heap(meta_address,meta_address->allocated_block_data_size - size - META_BLOCK_SIZE);
-    }
 //    new_free_block = meta_address->next;
-    new_free_block = get_payload_from_meta_address(meta_address) + size ;
+    new_free_block = get_payload_from_meta_address(meta_address) + size;
     new_free_block->prev = meta_address;
     new_free_block->free = true;
     new_free_block->next = meta_address->next;
@@ -117,7 +113,7 @@ bool split_block(size_t size, meta_block *meta_address) {
     // the latter one's prev equal to new one
     meta_address->free = false; // since you should return it
     meta_address->allocated_block_data_size = size;
-    meta_address->next->prev = new_free_block;
+    if (meta_address->next != NULL) { meta_address->next->prev = new_free_block; }
     // the older one's next one is equal to the new one
     meta_address->next = new_free_block;
     return true;
@@ -130,7 +126,7 @@ size_t round_align(size_t size, uint64_t round_byte) {
 }
 
 void *_malloc(size_t size) {
-    if(size<=0) return NULL;
+    if (size <= 0) return NULL;
     size = round_align(size, 8);
     // if already has an address
     if (heap_start_address) {
@@ -209,12 +205,13 @@ void merge_block(meta_block *latter_block) {
     //         => [][size+s2+meta] ->next = dropped next
     //         [][size]->next => [][size+expand]->next(deprecated)
     assert(latter_block->prev->free == true);
+    assert(latter_block->prev->next = latter_block);
     // record the size or the latter_block and set the space to be empty
     size_t size_of_meta_and_payload = META_BLOCK_SIZE + latter_block->allocated_block_data_size;
     // give the previous block more control space
     latter_block->prev->allocated_block_data_size += size_of_meta_and_payload;
     // set the previous' next to the dropped next
-    latter_block->next->prev = latter_block->prev;
+    if (latter_block->next != NULL) { latter_block->next->prev = latter_block->prev; }
     latter_block->prev->next = latter_block->next; // a expand finished
 
 }
@@ -229,12 +226,13 @@ bool address_validation(void *p) {
 }
 
 void last_free_chunk_handler() {
+    // back the last free blocks to os when it is appropriate
     meta_block *last = fetch_heap_last_meta_address();
     if (last->free && last->next == NULL) {
-        assert(last->prev->next != NULL);
+//        assert(last->prev->next != NULL);
         // delete the big free chunk
         brk(last);
-        last->prev->next = NULL;
+        if (last->prev != NULL) { last->prev->next = NULL; }
     }
 
 }
@@ -248,40 +246,56 @@ void *_free(void *ptr) {
     meta_block *curr_free_meta = get_meta_address_from_payload(ptr);
     //set must-walk free curr
     curr_free_meta->free = true;
-    // A F A or NULL F A or A F NULL
+    // A F A or NULL F A or A F NULL of NULL A NULL
+    if (curr_free_meta->next == NULL && curr_free_meta->prev == NULL) {
+        last_free_chunk_handler();
+        // since already set free
+        return NULL;
+    }
     // means no need to merge
-    if (curr_free_meta->next == NULL) {
-        memset(ptr, 0, get_meta_address_from_payload(ptr)->allocated_block_data_size);
-        // and since free is set, just return
-        return NULL;
-    }
-    if (curr_free_meta->prev == NULL) {
-        memset(ptr, 0, get_meta_address_from_payload(ptr)->allocated_block_data_size);
-        // and since free is set, just return
-        return NULL;
-    }
-    if ((curr_free_meta->prev == NULL && curr_free_meta->next->free == false)
-        | (curr_free_meta->next == NULL && curr_free_meta->prev->free == false)
-        | (curr_free_meta->prev->free == false && curr_free_meta->next->free == false)
+    if ((curr_free_meta->prev == NULL && curr_free_meta->next != NULL && curr_free_meta->next->free == false)
+        | (curr_free_meta->next == NULL && curr_free_meta->prev != NULL && curr_free_meta->prev->free == false)
+        | (curr_free_meta->next != NULL && curr_free_meta->prev != NULL
+           && curr_free_meta->prev->free == false && curr_free_meta->next->free == false)
             ) {
         // delete the payload info
         // A[F]A F:[meta][value] => [meta->free][0000]
         // A[F]A F:[meta][value] => [meta->free][origin]
-        memset(ptr, 0, get_meta_address_from_payload(ptr)->allocated_block_data_size);
+//        memset(ptr, 0, get_meta_address_from_payload(ptr)->allocated_block_data_size);
         // and since free is set, just return
+        last_free_chunk_handler();
         return NULL;
     }
     // merge the previous
     // A F A -> F F A-> FB A
-    if (curr_free_meta->prev != NULL && curr_free_meta->next->free == false && curr_free_meta->prev->free == true) {
+
+    // what if F F NULL
+    if (curr_free_meta->prev != NULL && curr_free_meta->next == NULL &&
+        curr_free_meta->prev->free == true) {
         //
         merge_block(curr_free_meta);
+        last_free_chunk_handler();
+        return NULL;
+    }
+    if (curr_free_meta->prev != NULL && curr_free_meta->next->free == false &&
+        curr_free_meta->prev->free == true) {
+        //
+        merge_block(curr_free_meta);
+        last_free_chunk_handler();
         return NULL;
     }
     // merge the next
     //A A F -> A F F -> A FB
-    if (curr_free_meta->next != NULL && curr_free_meta->prev->free == false && curr_free_meta->next->free == true) {
+    // what if NULL A F
+    if (curr_free_meta->next != NULL && curr_free_meta->prev == NULL && curr_free_meta->next->free == true) {
         merge_block(curr_free_meta->next);
+        last_free_chunk_handler();
+    }
+    if (curr_free_meta->prev != NULL) {
+        if (curr_free_meta->next != NULL && curr_free_meta->prev->free == false && curr_free_meta->next->free == true) {
+            merge_block(curr_free_meta->next);
+            last_free_chunk_handler();
+        }
     }
     // both merge (Actually same as previous, For Reader-Friendly purpose attach it here)
     // F A F -> F F F
@@ -290,7 +304,8 @@ void *_free(void *ptr) {
         curr_free_meta->next->free) {
         merge_block(curr_free_meta); // merge the first one
         merge_block(curr_free_meta->next); // merge tne second one
+        last_free_chunk_handler();
     }
-    last_free_chunk_handler();
 
+    return NULL;
 }
