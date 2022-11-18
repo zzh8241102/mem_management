@@ -191,18 +191,30 @@ void unit_test_8() {
  */
 // robust malloc and free
 void unit_test_9() {
+#if __linux__
+    for (int i = 0; i < 10; i++) {
+        int *a = _malloc(4096*1000*20);
+        memset(a, 100, 4096*1000*20);
+        system("free -h");
+        _free(a);
+        getchar()
+        int *smaller_chunk = _malloc(1);
+        _free(smaller_chunk);
+        system("free -h");
+        getchar();
+    }
+#else
     for (int i = 0; i < 10; i++) {
         int *a = _malloc(4096*100);
         memset(a, 100, 4096*100);
         printf("allocated\n");
         _free(a);
         getchar();
-        printf("we allocated a smaller chunk\n");
         int *smaller_chunk = _malloc(1);
         _free(smaller_chunk);
         getchar();
-
     }
+#endif
     printf("PASTED UNIT_TEST9!\n");
 }
 

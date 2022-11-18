@@ -121,7 +121,7 @@ bool split_block(size_t size, meta_block *meta_address) {
 }
 
 
-size_t round_align(size_t size, uint64_t round_byte) {
+size_t round_align(size_t size, u_int64_t round_byte) {
     return round_byte * ((size + round_byte - 1) / round_byte);
 }
 
@@ -231,8 +231,8 @@ void last_free_chunk_handler() {
     if (last->free && last->next == NULL) {
 //        assert(last->prev->next != NULL);
         // delete the big free chunk
+        if (last->prev != NULL && last->prev->next != NULL) { last->prev->next = NULL; }
         brk(last);
-        if (last->prev != NULL) { last->prev->next = NULL; }
     }
 
 }
@@ -290,11 +290,15 @@ void *_free(void *ptr) {
     if (curr_free_meta->next != NULL && curr_free_meta->prev == NULL && curr_free_meta->next->free == true) {
         merge_block(curr_free_meta->next);
         last_free_chunk_handler();
+        heap_start_address = NULL;
+        return NULL;
+
     }
     if (curr_free_meta->prev != NULL) {
         if (curr_free_meta->next != NULL && curr_free_meta->prev->free == false && curr_free_meta->next->free == true) {
             merge_block(curr_free_meta->next);
             last_free_chunk_handler();
+            return NULL;
         }
     }
     // both merge (Actually same as previous, For Reader-Friendly purpose attach it here)
@@ -305,6 +309,7 @@ void *_free(void *ptr) {
         merge_block(curr_free_meta); // merge the first one
         merge_block(curr_free_meta->next); // merge tne second one
         last_free_chunk_handler();
+        return NULL;
     }
 
     return NULL;

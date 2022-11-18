@@ -32,7 +32,7 @@ meta_block *get_meta_address_from_payload(void *payload_address);
 
 bool split_block(size_t size, meta_block *meta_address);
 
-size_t round_align(size_t size, uint64_t round_byte);
+size_t round_align(size_t size, u_int64_t round_byte);
 
 void merge_block(meta_block *latter_block);
 
