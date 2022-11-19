@@ -195,12 +195,12 @@ void unit_test_9() {
     for (int i = 0; i < 10; i++) {
         int *a = _malloc(4096*1000*20);
         memset(a, 100, 4096*1000*20);
-        system("free -h");
+        system("free -m");
         _free(a);
-        getchar()
+        getchar();
         int *smaller_chunk = _malloc(1);
         _free(smaller_chunk);
-        system("free -h");
+        system("free -m");
         getchar();
     }
 #else
@@ -252,6 +252,7 @@ void unit_test_demo_selector() {
     printf("+----------------------------------------------+\n");
     printf("Enter the unit test number you want to observe:\n");
     printf("+----------------------------------------------+\n");
+    printf("You can only select one test at one time and observe its behaviour\n");
     char input[10];
     scanf("%2s", input);
     int option = atoi(input);
@@ -291,6 +292,8 @@ void unit_test_demo_selector() {
 int main() {
 #if DEMO_PURPOSE
     unit_test_demo_selector();
+
 #endif
+
 }
 

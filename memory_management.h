@@ -1,3 +1,13 @@
+/**
+ * @FILE_NAME: memory_management.h
+ * @DESCRIPTION:Memory management function header file
+ * @MAIN_FUNC: void* _malloc(size_t size) and void* _free(void* ptr)
+ * @AUTHOR: Zihan Zhou
+ * @DATE: 2022-11
+ * @PURPOSE: The coursework of operating system
+ */
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
