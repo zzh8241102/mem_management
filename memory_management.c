@@ -24,8 +24,10 @@ meta_block *heap_start_address = NULL;
 
 
 static meta_block *fetch_heap_last_meta_address() {
-    assert(heap_start_address != NULL);
-
+//    assert(heap_start_address != NULL);
+    if(heap_start_address==NULL){
+        return NULL;
+    }
     // traverse the heap
     meta_block *curr = heap_start_address;
     while (curr->next != NULL) {
@@ -64,10 +66,12 @@ meta_block *extend_heap(meta_block *last_address, size_t size) {
 
 
 void *get_payload_from_meta_address(meta_block *meta_block_address) {
+    if(meta_block_address==NULL) return NULL;
     return (void *) (meta_block_address + 1); // add size of meta_block
 }
 
 meta_block *get_meta_address_from_payload(void *payload_address) {
+    if(payload_address==NULL) return NULL;
     return ((meta_block *) payload_address) - 1;
 }
 
@@ -111,8 +115,10 @@ size_t round_align(size_t size, u_int64_t round_byte) {
 }
 
 void *_malloc(size_t size) {
-    if (size <= 0) return NULL;
+    if ((int)size <= 0) return NULL;
     size = round_align(size, 8);
+    printf("The requested size is %zu(decimal)\n",size);
+    printf("The meta block size is %lu(decimal)\n",META_BLOCK_SIZE);
     // if already has an address
     if (heap_start_address) {
         meta_block *proper_meta_address = first_fit_search(size);
@@ -131,7 +137,7 @@ void *_malloc(size_t size) {
             if (!split_block(size, proper_meta_address)) {
 #if DEBUG_MODE
                 printf("+-----------------------------------------------------------------------------------+\n");
-                printf("We found some usable hole, No need to split, we apply the proper size for the new one, the meta address is%p ",
+                printf("We found some perfect hole, No need to split, we apply the proper size for the new one, the meta address is%p ",
                        proper_meta_address);
                 printf(" and the payload address is%p\n",
                        get_payload_from_meta_address(proper_meta_address));
@@ -217,7 +223,10 @@ void *_free(void *ptr) {
     // giving a ptr, and we set the pos to be freed [A F A]
     // And we do a "recursive-like" merge
     // [F F] A | [F F F] | A [F F]
-    if (!address_validation(ptr)) return NULL;
+    if (!address_validation(ptr)){
+        printf("invalid free address!\n");
+        return NULL;
+    }
     //find the meta_data from the ptr
     meta_block *curr_free_meta = get_meta_address_from_payload(ptr);
     //set must-walk free curr

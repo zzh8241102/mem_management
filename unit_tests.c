@@ -16,7 +16,7 @@
 // add unit tests here
 
 // warm_up test which fix the address
-void unit_test_1() {
+void warm_up() {
     printf("sbrk-init%p\n", sbrk(0));
     int *a = _malloc(4);
     printf("sbrk --1st all%p\n", sbrk(0));
@@ -24,8 +24,6 @@ void unit_test_1() {
     printf("sbrk --2nd all%p\n", sbrk(0));
     int *c = _malloc(4);
     printf("sbrk --3rd all%p\n", sbrk(0));
-    printf("sbrk --advance all%p\n", sbrk(0));
-    printf("------------ UNIT TEST OBSERVATION_PLACE ------------ \n");
     printf("%p\n", a);
     printf("%p\n", b);
     printf("%p\n", c);
@@ -46,10 +44,9 @@ void unit_test_2() {
     // free b
     _free(b);
     printf("------------ UNIT TEST2 OBSERVATION_PLACE ------------ \n");
-//    printf("a malloc %p\n",a);
-//    printf("c malloc %p\n",c);
-//    printf("d malloc %p\n",d);
     int *new_b = _malloc(4);
+    printf("The new address is %p\n", new_b);
+    printf("The freed perfect address is %p, which should be same as the new address\n", b);
     assert(new_b == stored_b);
     printf("PASTED UNIT_TEST2!\n");
 
@@ -68,13 +65,15 @@ void unit_test_3() {
     memset(c, 0, 8);
     int *d = _malloc(4);
     memset(d, 0, 8);
-    printf("------------ UNIT TEST 3 OBSERVATION_PLACE ------------ \n");
     _free(b);
     _free(c);
     // b c previously has
     // [meta][8] [meta][8] meta is 0x20 = 32 32*2+8*2 =80 = 0x50
     // after merge the space available is 80-32=48
     int *new_alloc = _malloc(48);
+    printf("Since after merge,there will be a 32*2+8*2 = 80(0x50) hole,remain80-32=48,\n we allocate 48, and the new address is %p\n",
+           new_alloc);
+    printf("which should be the same as the address of prev b %p\n", stored_b);
     assert(new_alloc == stored_b);
     printf("PASTED UNIT_TEST3!\n");
 }
@@ -90,13 +89,15 @@ void unit_test_4() {
     memset(c, 0, 8);
     int *d = _malloc(4);
     memset(d, 0, 8);
-    printf("------------ UNIT TEST4 OBSERVATION_PLACE ------------ \n");
     _free(c);
     _free(b);
     // b c previously has
     // [meta][8] [meta][8] meta is 0x20 = 32 32*2+8*2 =80 = 0x50
     // after merge the space available is 80-32=48
     int *new_alloc = _malloc(48);
+    printf("Since after back merge,there will be a 32*2+8*2 = 80(0x50) hole,remain80-32=48,\n we allocate 48, and the new address is %p\n",
+           new_alloc);
+    printf("which should be the same as the address of prev b %p\n", stored_b);
     assert(new_alloc == stored_b);
     printf("PASTED UNIT_TEST4!\n");
 }
@@ -122,6 +123,9 @@ void unit_test_5() {
     // [meta][8] [meta][8] [meta][8] meta is 0x20 = 32 32*3+8*3 = 120
     // after merge the space available is 120-32=88
     int *new_alloc = _malloc(88);
+    printf("Since after back merge,there will be a 32*3+8*3 = 120 hole,\n we allocate 120-32 = 88, and the new address is %p\n",
+           new_alloc);
+    printf("which should be the same as the address of prev b %p\n", stored_b);
     assert(new_alloc == stored_b);
     printf("PASTED UNIT_TEST5!\n");
 }
@@ -135,9 +139,10 @@ void unit_test_5() {
 void unit_test_6() {
     int *a = _malloc(48);
     int *stored_a = a;
-    _free(a);
     int *b = _malloc(48);
-    assert(stored_a == b);
+    _free(a);
+    int *c = _malloc(48);
+    assert(stored_a == c);
     printf("PASTED UNIT_TEST6!\n");
 
 }
@@ -147,9 +152,10 @@ void unit_test_7() {
     // [meta][48] -> []
     int *a = _malloc(48);
     int *stored_a = a;
+    int *b = _malloc(48);
     _free(a);
-    int *b = _malloc(6);
-    assert(stored_a == b);
+    int *c = _malloc(6);
+    assert(stored_a == c);
     printf("PASTED UNIT_TEST7!\n");
 
 }
@@ -169,19 +175,20 @@ void unit_test_8() {
     int *stored_c = c;
     _free(b);
     // after that there are 48 remain and can be split
+    printf("After that there are 48 remain and can be split\n");
+    printf("we allocate a small 4 size block and remain 32+12 spaces,it will take the 4 previous space\n");
     int *size1 = _malloc(4);
     memset(a, 0, 8);
     // give 4 and b will take the previous place
     // also a new block sized 48-4==44 [32][12]
     // after that the
+    printf("The new address should be same as previous address b, which is %p\n", size1);
     assert(b == size1);
     int *size2 = _malloc(4);
     memset(a, 0, 8);
-    // assert the heap is not extended
-//    printf("b payload %p is: ", b);
-    // the address of size2 should b+align(sizeb)+meta_block
-    // notice here
-//    printf("size2 payload is %p\n", size2);
+    printf("Again we allocated a size 4 block, and the address of this is %p\n", size2);
+    printf("So from b, the size 2 should be b+8+Metasize, which is %p\n",
+           (void *) b + round_align(4, 8) + META_BLOCK_SIZE);
     assert(size2 == (void *) b + round_align(4, 8) + META_BLOCK_SIZE);
     printf("PASTED UNIT_TEST8!\n");
 }
@@ -197,21 +204,24 @@ void unit_test_9() {
         memset(a, 100, 4096*1000*20);
         system("free -m");
         _free(a);
+        printf("Enter...\n");
         getchar();
         int *smaller_chunk = _malloc(1);
         _free(smaller_chunk);
         system("free -m");
+        printf("Enter...\n");
         getchar();
     }
 #else
     for (int i = 0; i < 10; i++) {
-        int *a = _malloc(4096*100);
-        memset(a, 100, 4096*100);
-        printf("allocated\n");
+        int *a = _malloc(4096 * 100);
+        memset(a, 100, 4096 * 100);
         _free(a);
+        printf("Enter...\n");
         getchar();
         int *smaller_chunk = _malloc(1);
         _free(smaller_chunk);
+        printf("Enter...\n");
         getchar();
     }
 #endif
@@ -226,31 +236,40 @@ typedef struct test_ {
 } test_block;
 
 void unit_test_10() {
+    printf("This is a test used to ensure every data type is usable\n");
     int *a = _malloc(4 * sizeof(int));
-    memset(a,0,4*sizeof(int));
+    memset(a, 0, 4 * sizeof(int));
     _free(a);
     short *b = _malloc(4 * sizeof(short));
-    memset(a,0,4*sizeof(short));
+    memset(a, 0, 4 * sizeof(short));
     _free(b);
     long *c = _malloc(4 * sizeof(long));
-    memset(a,0,4*sizeof(long));
+    memset(a, 0, 4 * sizeof(long));
     _free(c);
     float *d = _malloc((4 * sizeof(float)));
-    memset(a,0,4*sizeof(float));
+    memset(a, 0, 4 * sizeof(float));
     _free(d);
     test_block *p = (test_block *) _malloc(100 * sizeof(test_block));
-    memset(a,0,100*sizeof(test_block));
+    memset(a, 0, 100 * sizeof(test_block));
     _free(p);
     printf("PASTED UNIT_TEST10!\n");
 
 }
 
-// TODO: test the impl of split
+void unit_test_11() {
+    int *b = _malloc(0);
+    assert(b == NULL);
+    int *c = _malloc(-1);
+    assert(c == NULL);
+    _free(b);
+    _free(c);
+    printf("Passed the test if free says two invalid address!\n");
+}
 
 void unit_test_demo_selector() {
 //TODO: ADD CLEAN OPS
     printf("+----------------------------------------------+\n");
-    printf("Enter the unit test number you want to observe:\n");
+    printf("Enter the unit test number(2-11) you want to observe:\n");
     printf("+----------------------------------------------+\n");
     printf("You can only select one test at one time and observe its behaviour\n");
     char input[10];
@@ -284,8 +303,11 @@ void unit_test_demo_selector() {
         case 10:
             unit_test_10();
             break;
-//        default:
-//            printf("No this case, re-prompt the program and check if there are any typos");
+        case 11:
+            unit_test_11();
+            break;
+        default:
+            printf("No this case, re-prompt the program and check if there are any typos");
     }
 }
 
